@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from app.services.gitlab_integration import fetch_merge_request_changes, post_feedback_to_gitlab
 from app.services.ai_integration import analyze_code_with_ai
-import app.config.git_config as config
+import os
 
 app = Flask(__name__)
 
@@ -9,7 +9,7 @@ app = Flask(__name__)
 def webhook():
     # Validate webhook request
     secret = request.headers.get('X-Gitlab-Token')
-    if secret != config.GITLAB_SECRET:
+    if secret != os.getenv("GITLAB_SECRET"):
         return "Unauthorized", 401
 
     event = request.json
@@ -17,9 +17,10 @@ def webhook():
     # Check if the event is for merge request
     if event.get('object_kind') == 'merge_request':
         project_id = event['object_attributes']['target_project_id']
-        merge_request_iid = event['object_attributes']['iid']
+        merge_request_iid = event['object_attributes']['id']
         merge_request_url = event['object_attributes']['url']
         user_name = event['user']['name']
+        commit_sha = event['object_attributes']['last_commit']['id']
 
         print(f"Processing MR {merge_request_iid} by {user_name}: {merge_request_url}")
 
@@ -28,8 +29,11 @@ def webhook():
 
         print("this si below analizer")
 
+
+        print('This are the changes', changes)
+
         # Generate AI feedback
-        feedback = analyze_code_with_ai(changes)
+        feedback = analyze_code_with_ai(changes, commit_sha, project_id)
 
         print("beford feedback")
 
